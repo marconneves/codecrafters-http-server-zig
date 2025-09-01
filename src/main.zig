@@ -33,7 +33,7 @@ pub fn main() !void {
     var headers = HttpHeaders{ .headers = &.{} };
     defer headers.deinit(alloc);
 
-    try headers.add(alloc, "Content-Type", "text/html");
+    try headers.add(alloc, "Content-Type", "text/plain");
 
     var resp = res.HttpResponse{ .status = undefined, .headers = headers };
 
