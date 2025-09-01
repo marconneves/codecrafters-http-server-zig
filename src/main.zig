@@ -37,7 +37,11 @@ pub fn main() !void {
 
     var resp = res.HttpResponse{ .status = undefined, .headers = headers };
 
-    if (std.mem.startsWith(u8, request.uri, "/echo/")) {
+    if (std.mem.eql(u8, request.uri, "/")) {
+        resp.status = res.HttpResponseStatusCode.OK;
+        resp.body = "";
+        resp.headers = headers;
+    } else if (std.mem.startsWith(u8, request.uri, "/echo/")) {
         var parts = std.mem.splitSequence(u8, request.uri, "/");
 
         _ = parts.next();
