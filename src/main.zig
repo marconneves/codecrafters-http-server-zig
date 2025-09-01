@@ -33,11 +33,10 @@ pub fn main() !void {
     var headers = HttpHeaders{ .headers = &.{} };
     defer headers.deinit(alloc);
 
-    try headers.add(alloc, "Content-Type", "text/plain");
-
-    var resp = res.HttpResponse{ .status = undefined, .headers = headers };
+    var resp = res.HttpResponse{ .status = res.HttpResponseStatusCode.NotFound, .headers = headers };
 
     if (std.mem.eql(u8, request.uri, "/")) {
+        try headers.add(alloc, "Content-Type", "text/plain");
         resp.status = res.HttpResponseStatusCode.OK;
         resp.body = "";
         resp.headers = headers;
@@ -48,20 +47,40 @@ pub fn main() !void {
         _ = parts.next();
 
         if (parts.next()) |body_value| {
-            resp.status = res.HttpResponseStatusCode.OK;
-
+            try headers.add(alloc, "Content-Type", "text/plain");
+            
             var len_buffer: [32]u8 = undefined;
             const len_str = try std.fmt.bufPrint(&len_buffer, "{}", .{body_value.len});
             try headers.add(alloc, "Content-Length", len_str);
 
+            resp.status = res.HttpResponseStatusCode.OK;
             resp.body = body_value;
             resp.headers = headers;
         } else {
+            try headers.add(alloc, "Content-Type", "text/plain");
+            resp.status = res.HttpResponseStatusCode.BadRequest;
+            resp.body = "";
+            resp.headers = headers;
+        }
+    } else if (std.mem.eql(u8, request.uri, "/user-agent")) {
+        if (request.headers.get("User-Agent")) |agent| {
+            try headers.add(alloc, "Content-Type", "text/plain");
+            
+            var len_buffer: [32]u8 = undefined;
+            const len_str = try std.fmt.bufPrint(&len_buffer, "{}", .{agent.len});
+            try headers.add(alloc, "Content-Length", len_str);
+
+            resp.status = res.HttpResponseStatusCode.OK;
+            resp.body = agent;
+            resp.headers = headers;
+        } else {
+            try headers.add(alloc, "Content-Type", "text/plain");
             resp.status = res.HttpResponseStatusCode.BadRequest;
             resp.body = "";
             resp.headers = headers;
         }
     } else {
+        try headers.add(alloc, "Content-Type", "text/plain");
         resp.status = res.HttpResponseStatusCode.NotFound;
         resp.headers = headers;
     }
