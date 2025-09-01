@@ -31,7 +31,7 @@ pub const HttpResponse = struct {
 
     fn parse_status(status_enum: HttpResponseStatusCode) []const u8 {
         const status_map = std.static_string_map.StaticStringMap([]const u8).initComptime(.{
-            .{ @tagName(.OK), "200 Ok" },
+            .{ @tagName(.OK), "200 OK" },
             .{ @tagName(.Created), "201 Created" },
             .{ @tagName(.BadRequest), "400 Bad Request" },
             .{ @tagName(.NotFound), "404 Not Found" },
