@@ -1,5 +1,5 @@
 const std = @import("std");
-const req = @import("http_request.zig");
+const HttpHeaders = @import("http_headers.zig").HttpHeaders;
 const constants = @import("constants.zig");
 
 pub const HttpResponseStatusCode = enum(u16) {
@@ -12,14 +12,20 @@ pub const HttpResponseStatusCode = enum(u16) {
 pub const HttpResponse = struct {
     version: []const u8 = "HTTP/1.1",
     status: HttpResponseStatusCode,
+    headers: HttpHeaders,
+    body: []const u8 = "",
 
     pub fn done(self: *const HttpResponse, buffer: []u8) ![]u8 {
         const status_parsed = parse_status(self.status);
 
+        var headers_buffer: [1024]u8 = undefined;
+
+        const headers_parse = try self.headers.stringfy(&headers_buffer);
+
         return std.fmt.bufPrint(
             buffer,
-            "{s} {s}" ++ constants.EOL ++ constants.EOL,
-            .{ self.version, status_parsed },
+            "{s} {s}\r\n{s}\r\n{s}" ++ constants.EOL ++ constants.EOL,
+            .{ self.version, status_parsed, headers_parse, self.body },
         );
     }
 

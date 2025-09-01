@@ -1,7 +1,12 @@
 const std = @import("std");
 const net = std.net;
-const req = @import("http_request.zig");
-const res = @import("http_response.zig");
+
+const req = @import("http/http_request.zig");
+const res = @import("http/http_response.zig");
+
+const headersImport = @import("http/http_headers.zig");
+const HttpHeaders = headersImport.HttpHeaders;
+const HttpHeader = headersImport.HttpHeader;
 
 pub fn main() !void {
     var gba = std.heap.GeneralPurposeAllocator(.{}){};
@@ -25,14 +30,36 @@ pub fn main() !void {
 
     var resp_buffer: [1024]u8 = undefined;
 
-    var resp = res.HttpResponse{
-        .status = undefined,
-    };
+    var headers = HttpHeaders{ .headers = &.{} };
+    defer headers.deinit(alloc);
 
-    if (std.mem.eql(u8, request.uri, "/")) {
-        resp.status = res.HttpResponseStatusCode.OK;
+    try headers.add(alloc, "Content-Type", "text/html");
+
+    var resp = res.HttpResponse{ .status = undefined, .headers = headers };
+
+    if (std.mem.startsWith(u8, request.uri, "/echo/")) {
+        var parts = std.mem.splitSequence(u8, request.uri, "/");
+
+        _ = parts.next();
+        _ = parts.next();
+
+        if (parts.next()) |body_value| {
+            resp.status = res.HttpResponseStatusCode.OK;
+
+            var len_buffer: [32]u8 = undefined;
+            const len_str = try std.fmt.bufPrint(&len_buffer, "{}", .{body_value.len});
+            try headers.add(alloc, "Content-Length", len_str);
+
+            resp.body = body_value;
+            resp.headers = headers;
+        } else {
+            resp.status = res.HttpResponseStatusCode.BadRequest;
+            resp.body = "";
+            resp.headers = headers;
+        }
     } else {
         resp.status = res.HttpResponseStatusCode.NotFound;
+        resp.headers = headers;
     }
 
     std.debug.print("Request: {any}, {s}, {s}\n", .{ request.method, request.uri, request.version });
