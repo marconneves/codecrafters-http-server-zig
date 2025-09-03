@@ -22,8 +22,16 @@ pub fn main() !void {
 
     defer listener.deinit();
 
-    var connection = try listener.accept();
-    try stdout.print("client connected!\n", .{});
+    while (true) {
+        try stdout.print("await connection!\n", .{});
+        const connection = try listener.accept();
+
+        _ = try std.Thread.spawn(.{}, handleRequest, .{ alloc, connection });
+    }
+}
+
+fn handleRequest(alloc: std.mem.Allocator, connection: net.Server.Connection) !void {
+    defer connection.stream.close();
 
     const request = try req.HttpRequest.parse(alloc, connection.stream.reader().any());
     defer request.deinit(alloc);
@@ -48,7 +56,7 @@ pub fn main() !void {
 
         if (parts.next()) |body_value| {
             try headers.add(alloc, "Content-Type", "text/plain");
-            
+
             var len_buffer: [32]u8 = undefined;
             const len_str = try std.fmt.bufPrint(&len_buffer, "{}", .{body_value.len});
             try headers.add(alloc, "Content-Length", len_str);
@@ -65,7 +73,7 @@ pub fn main() !void {
     } else if (std.mem.eql(u8, request.uri, "/user-agent")) {
         if (request.headers.get("User-Agent")) |agent| {
             try headers.add(alloc, "Content-Type", "text/plain");
-            
+
             var len_buffer: [32]u8 = undefined;
             const len_str = try std.fmt.bufPrint(&len_buffer, "{}", .{agent.len});
             try headers.add(alloc, "Content-Length", len_str);
@@ -88,6 +96,4 @@ pub fn main() !void {
     std.debug.print("Request: {any}, {s}, {s}\n", .{ request.method, request.uri, request.version });
 
     _ = try connection.stream.writer().write(try resp.done(&resp_buffer));
-
-    connection.stream.close();
 }
