@@ -41,13 +41,49 @@ fn handleRequest(alloc: std.mem.Allocator, connection: net.Server.Connection) !v
     var headers = HttpHeaders{ .headers = &.{} };
     defer headers.deinit(alloc);
 
-    var resp = res.HttpResponse{ .status = res.HttpResponseStatusCode.NotFound, .headers = headers };
+    var resp = res.HttpResponse{ .connection = connection, .status = res.HttpResponseStatusCode.NotFound, .headers = headers };
 
     if (std.mem.eql(u8, request.uri, "/")) {
         try headers.add(alloc, "Content-Type", "text/plain");
         resp.status = res.HttpResponseStatusCode.OK;
         resp.body = "";
         resp.headers = headers;
+    } else if (std.mem.startsWith(u8, request.uri, "/files/")) {
+        var parts = std.mem.splitSequence(u8, request.uri, "/");
+
+        _ = parts.next();
+        _ = parts.next();
+
+        if (parts.next()) |file_name| {
+            if (std.fs.cwd().openFile(file_name, .{ .mode = .read_only })) |file| {
+                const data = try file.readToEndAlloc(alloc, 1024 * 1024);
+
+                const stat = try file.stat();
+                const file_size = stat.size;
+
+                std.debug.print("File '{s}' exists.\n", .{file_name});
+
+                try headers.add(alloc, "Content-Type", "application/octet-stream");
+
+                var len_buffer: [32]u8 = undefined;
+                const len_str = try std.fmt.bufPrint(&len_buffer, "{}", .{file_size});
+                try headers.add(alloc, "Content-Length", len_str);
+
+                resp.status = res.HttpResponseStatusCode.OK;
+                resp.body = data;
+                resp.headers = headers;
+            } else |_| {
+                try headers.add(alloc, "Content-Type", "text/plain");
+                resp.status = res.HttpResponseStatusCode.NotFound;
+                resp.body = "";
+                resp.headers = headers;
+            }
+        } else {
+            try headers.add(alloc, "Content-Type", "text/plain");
+            resp.status = res.HttpResponseStatusCode.BadRequest;
+            resp.body = "";
+            resp.headers = headers;
+        }
     } else if (std.mem.startsWith(u8, request.uri, "/echo/")) {
         var parts = std.mem.splitSequence(u8, request.uri, "/");
 
@@ -95,5 +131,5 @@ fn handleRequest(alloc: std.mem.Allocator, connection: net.Server.Connection) !v
 
     std.debug.print("Request: {any}, {s}, {s}\n", .{ request.method, request.uri, request.version });
 
-    _ = try connection.stream.writer().write(try resp.done(&resp_buffer));
+    try resp.done(&resp_buffer);
 }
