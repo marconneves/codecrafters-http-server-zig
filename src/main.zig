@@ -8,7 +8,19 @@ const headersImport = @import("http/http_headers.zig");
 const HttpHeaders = headersImport.HttpHeaders;
 const HttpHeader = headersImport.HttpHeader;
 
+var directory: ?[]const u8 = null;
+
 pub fn main() !void {
+    var argIt = std.process.args();
+    while (argIt.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--directory")) {
+            directory = argIt.next() orelse {
+                std.log.err("The `--directory` flag requires an argument\n", .{});
+                std.process.exit(1);
+            };
+        }
+    }
+
     var gba = std.heap.GeneralPurposeAllocator(.{}){};
 
     const alloc = gba.allocator();
@@ -55,7 +67,10 @@ fn handleRequest(alloc: std.mem.Allocator, connection: net.Server.Connection) !v
         _ = parts.next();
 
         if (parts.next()) |file_name| {
-            if (std.fs.cwd().openFile(file_name, .{ .mode = .read_only })) |file| {
+            var paths: [2][]const u8 = .{ directory.?, file_name };
+            const file_path = try std.fs.path.join(alloc, &paths);
+
+            if (std.fs.cwd().openFile(file_path, .{ .mode = .read_only })) |file| {
                 const data = try file.readToEndAlloc(alloc, 1024 * 1024);
 
                 const stat = try file.stat();
